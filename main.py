@@ -33,7 +33,8 @@ def cli():
 @click.option("--output", "-o", default=None, help="Output HTML file (default: <company>_culture.html)")
 @click.option("--limit", "-n", default=40, help="Max Reddit posts to fetch")
 @click.option("--no-html", is_flag=True, help="Skip HTML report, terminal only")
-def analyze(company, output, limit, no_html):
+@click.option("--no-reddit", is_flag=True, help="Skip Reddit scraping (use if no Reddit API key yet)")
+def analyze(company, output, limit, no_html, no_reddit):
     """Analyze company culture from Reddit and Glassdoor.
 
     Example: python main.py analyze Shopify
@@ -52,25 +53,33 @@ def analyze(company, output, limit, no_html):
 
         # Reddit main search
         task = progress.add_task("Searching Reddit...", total=None)
-        try:
-            posts = scrape_reddit(company, limit=limit)
-            all_posts.extend(posts)
-            progress.update(task, description=f"[green]✓ Reddit: {len(posts)} posts[/green]")
-        except ValueError as e:
-            progress.update(task, description=f"[yellow]⚠ Reddit: {str(e).split(chr(10))[0]}[/yellow]")
-        except Exception as e:
-            progress.update(task, description=f"[red]✗ Reddit error: {e}[/red]")
-        progress.stop_task(task)
+        if no_reddit:
+            progress.update(task, description="[dim]Reddit skipped (--no-reddit)[/dim]")
+            progress.stop_task(task)
+        else:
+            try:
+                posts = scrape_reddit(company, limit=limit)
+                all_posts.extend(posts)
+                progress.update(task, description=f"[green]✓ Reddit: {len(posts)} posts[/green]")
+            except ValueError as e:
+                progress.update(task, description=f"[yellow]⚠ Reddit: {str(e).split(chr(10))[0]}[/yellow]")
+            except Exception as e:
+                progress.update(task, description=f"[red]✗ Reddit error: {e}[/red]")
+            progress.stop_task(task)
 
         # Reddit company subreddit
         task = progress.add_task(f"Checking r/{company.lower()}...", total=None)
-        try:
-            sub_posts = scrape_reddit_company_sub(company)
-            all_posts.extend(sub_posts)
-            progress.update(task, description=f"[green]✓ r/{company.lower()}: {len(sub_posts)} posts[/green]")
-        except Exception:
-            progress.update(task, description=f"[dim]No company subreddit found[/dim]")
-        progress.stop_task(task)
+        if no_reddit:
+            progress.update(task, description="[dim]Skipped[/dim]")
+            progress.stop_task(task)
+        else:
+            try:
+                sub_posts = scrape_reddit_company_sub(company)
+                all_posts.extend(sub_posts)
+                progress.update(task, description=f"[green]✓ r/{company.lower()}: {len(sub_posts)} posts[/green]")
+            except Exception:
+                progress.update(task, description=f"[dim]No company subreddit found[/dim]")
+            progress.stop_task(task)
 
         # Glassdoor snippets
         task = progress.add_task("Fetching Glassdoor snippets...", total=None)
@@ -144,5 +153,27 @@ def setup():
     console.print("\nRun: [cyan]python main.py analyze Shopify[/cyan]")
 
 
+
+
+
+@cli.command()
+@click.argument("company")
+@click.argument("text")
+@click.option("--output", "-o", default=None)
+def test_analyze(company, text, output):
+    """Test AI analysis with manually provided text.
+
+    Example: python main.py test-analyze Shopify "great work life balance but slow promotions"
+    """
+    from analyzer.sentiment import analyze_company
+    from report import print_terminal_report, generate_html_report
+
+    fake_posts = [{"source": "manual", "text": text, "comments": []}]
+    analysis = analyze_company(company, fake_posts)
+    print_terminal_report(company, analysis)
+
+    output_path = output or f"{company.lower()}_culture.html"
+    generate_html_report(company, analysis, output_path)
+    console.print(f"[bold]HTML Report:[/bold] {output_path}")
 if __name__ == "__main__":
     cli()

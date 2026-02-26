@@ -9,11 +9,16 @@ import re
 import requests
 from typing import List, Dict
 from collections import defaultdict
+from pathlib import Path
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).parent.parent / ".env", override=True)
+except ImportError:
+    pass
 
-# Keyword lists for fallback analysis
+API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+
 TOPIC_KEYWORDS = {
     "work_life_balance": [
         "work life balance", "work-life", "overtime", "crunch", "long hours",
@@ -59,103 +64,72 @@ NEGATIVE_WORDS = {
 }
 
 
+def _get_key() -> str:
+    return os.environ.get("GEMINI_API_KEY", "").strip()
+
+
 def analyze_with_gemini(company: str, texts: List[str]) -> Dict:
-    """Use Gemini to do deep analysis of collected text."""
-    if not GEMINI_API_KEY or not texts:
+    key = _get_key()
+    if not key or not texts:
         return {}
 
-    combined = "\n---\n".join(texts[:30])  # limit tokens
+    combined = "\n---\n".join(texts[:20])
 
-    prompt = f"""Analyze these employee reviews and discussions about {company}.
+    prompt = f"""You are analyzing employee reviews about {company}. Based on the text below, return ONLY a valid JSON object. No explanation, no markdown, no code fences - just the raw JSON.
 
-<texts>
-{combined[:6000]}
-</texts>
+Text:
+{combined[:4000]}
 
-Return a JSON object with this exact structure:
-{{
-  "work_life_balance": {{
-    "score": <1-10>,
-    "summary": "<one sentence>",
-    "evidence": ["<quote or paraphrase>", "<quote or paraphrase>"]
-  }},
-  "management": {{
-    "score": <1-10>,
-    "summary": "<one sentence>",
-    "evidence": ["<quote or paraphrase>", "<quote or paraphrase>"]
-  }},
-  "career_growth": {{
-    "score": <1-10>,
-    "summary": "<one sentence>",
-    "evidence": ["<quote or paraphrase>", "<quote or paraphrase>"]
-  }},
-  "compensation": {{
-    "score": <1-10>,
-    "summary": "<one sentence>",
-    "evidence": ["<quote or paraphrase>", "<quote or paraphrase>"]
-  }},
-  "culture": {{
-    "score": <1-10>,
-    "summary": "<one sentence>",
-    "evidence": ["<quote or paraphrase>", "<quote or paraphrase>"]
-  }},
-  "interview": {{
-    "score": <1-10>,
-    "summary": "<one sentence>",
-    "evidence": ["<quote or paraphrase>", "<quote or paraphrase>"]
-  }},
-  "overall_verdict": "<2-3 sentence honest summary of what it's really like to work there>",
-  "red_flags": ["<specific concern>", "<specific concern>"],
-  "green_flags": ["<specific positive>", "<specific positive>"],
-  "data_quality": "<low|medium|high> - based on how much relevant data was found"
-}}
-
-Be honest and specific. If data is insufficient, say so in data_quality.
-Return valid JSON only, no markdown."""
+Return this exact JSON structure with your analysis:
+{{"work_life_balance":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"management":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"career_growth":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"compensation":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"culture":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"interview":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"overall_verdict":"2-3 sentence summary","red_flags":["concern1","concern2"],"green_flags":["positive1","positive2"],"data_quality":"medium"}}"""
 
     try:
         resp = requests.post(
-            f"{API_URL}?key={GEMINI_API_KEY}",
+            f"{API_URL}?key={key}",
             headers={"Content-Type": "application/json"},
             json={
                 "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048},
+                "generationConfig": {
+                    "temperature": 0.1,
+                    "maxOutputTokens": 4096,
+                    "responseMimeType": "application/json",
+                },
             },
             timeout=30,
         )
         resp.raise_for_status()
-        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        raw = resp.json()
+
+        text = raw["candidates"][0]["content"]["parts"][0]["text"]
+
         text = text.strip()
-        if text.startswith("```"):
-            lines = text.split("\n")
-            text = "\n".join(lines[1:-1])
-        return json.loads(text.strip())
-    except Exception:
+        # Strip markdown fences if present
+        if "```" in text:
+            match = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+            if match:
+                text = match.group(1).strip()
+        # Extract JSON object
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start != -1 and end > start:
+            text = text[start:end]
+
+        return json.loads(text)
+    except Exception as e:
+        print(f"[Gemini error] {e}")
         return {}
 
 
 def keyword_analysis(texts: List[str]) -> Dict:
-    """Fallback: keyword-based analysis when no Gemini key."""
     combined = " ".join(texts).lower()
     results = {}
 
     for topic, keywords in TOPIC_KEYWORDS.items():
         mentions = sum(1 for kw in keywords if kw in combined)
-        # Count positive/negative context around topic keywords
         pos = sum(1 for w in POSITIVE_WORDS if w in combined)
         neg = sum(1 for w in NEGATIVE_WORDS if w in combined)
-
-        if mentions == 0:
-            score = 5  # neutral if not mentioned
-        else:
-            ratio = pos / max(pos + neg, 1)
-            score = round(3 + ratio * 6)  # 3-9 range
-
-        results[topic] = {
-            "score": score,
-            "summary": f"Based on {mentions} keyword mentions.",
-            "evidence": [],
-        }
+        score = 5 if mentions == 0 else round(3 + (pos / max(pos + neg, 1)) * 6)
+        results[topic] = {"score": score, "summary": f"Based on {mentions} keyword mentions.", "evidence": []}
 
     results["overall_verdict"] = "Analysis based on keyword frequency (no Gemini API key)."
     results["red_flags"] = []
@@ -165,12 +139,8 @@ def keyword_analysis(texts: List[str]) -> Dict:
 
 
 def analyze_company(company: str, all_posts: List[Dict]) -> Dict:
-    """Main analysis function."""
     if not all_posts:
-        return {
-            "error": "No data found for this company.",
-            "total_sources": 0,
-        }
+        return {"error": "No data found for this company.", "total_sources": 0}
 
     texts = []
     for post in all_posts:
@@ -180,16 +150,13 @@ def analyze_company(company: str, all_posts: List[Dict]) -> Dict:
             if comment.get("text"):
                 texts.append(comment["text"])
 
-    # Try Gemini first, fall back to keywords
-    if GEMINI_API_KEY:
-        analysis = analyze_with_gemini(company, texts)
-    else:
-        analysis = {}
+    key = _get_key()
+
+    analysis = analyze_with_gemini(company, texts) if key else {}
 
     if not analysis:
-        analysis = keyword_analysis(texts)
+            analysis = keyword_analysis(texts)
 
-    # Add metadata
     source_counts = defaultdict(int)
     for post in all_posts:
         source_counts[post.get("source", "unknown")] += 1
@@ -199,7 +166,7 @@ def analyze_company(company: str, all_posts: List[Dict]) -> Dict:
         "total_posts": len(all_posts),
         "total_text_samples": len(texts),
         "sources": dict(source_counts),
-        "used_ai": bool(GEMINI_API_KEY and analysis.get("data_quality")),
+        "used_ai": bool(key and analysis.get("data_quality") and analysis.get("data_quality") != "low"),
     }
 
     return analysis
