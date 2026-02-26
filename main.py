@@ -51,6 +51,7 @@ def analyze(company, output, limit, no_html, no_reddit):
     """
     from scrapers.reddit import scrape_reddit, scrape_reddit_company_sub
     from scrapers.glassdoor import scrape_glassdoor_snippets, scrape_indeed_reviews
+    from scrapers.yimusan import scrape_yimusan
     from analyzer.sentiment import analyze_company
     from report import print_terminal_report, generate_html_report
 
@@ -107,6 +108,15 @@ def analyze(company, output, limit, no_html, no_reddit):
             progress.update(task, description=f"[red]✗ Indeed error: {e}[/red]")
         progress.stop_task(task)
 
+        task = progress.add_task("Fetching 一亩三分地...", total=None)
+        try:
+            yms = scrape_yimusan(company)
+            all_posts.extend(yms)
+            progress.update(task, description=f"[green]✓ 一亩三分地: {len(yms)} posts[/green]")
+        except Exception as e:
+            progress.update(task, description=f"[red]✗ 一亩三分地 error: {e}[/red]")
+        progress.stop_task(task)
+
         task = progress.add_task("Analyzing with AI...", total=None)
         analysis = analyze_company(company, all_posts)
         ai_used = analysis.get("metadata", {}).get("used_ai", False)
@@ -140,6 +150,7 @@ def compare(companies, no_reddit, output):
     load_dotenv(Path(__file__).parent / ".env", override=True)
     from scrapers.reddit import scrape_reddit, scrape_reddit_company_sub
     from scrapers.glassdoor import scrape_glassdoor_snippets, scrape_indeed_reviews
+    from scrapers.yimusan import scrape_yimusan
     from analyzer.sentiment import analyze_company
     from report import print_terminal_report, generate_comparison_html
 
@@ -174,6 +185,15 @@ def compare(companies, no_reddit, output):
                 progress.update(task, description=f"[green]✓ {len(all_posts)} total sources[/green]")
             except Exception as e:
                 progress.update(task, description=f"[red]✗ {e}[/red]")
+            progress.stop_task(task)
+
+            task = progress.add_task("Fetching 一亩三分地...", total=None)
+            try:
+                yms = scrape_yimusan(company)
+                all_posts.extend(yms)
+                progress.update(task, description=f"[green]✓ 一亩三分地: {len(yms)} posts[/green]")
+            except Exception as e:
+                progress.update(task, description=f"[red]✗ 一亩三分地: {e}[/red]")
             progress.stop_task(task)
 
             task = progress.add_task("Analyzing...", total=None)
