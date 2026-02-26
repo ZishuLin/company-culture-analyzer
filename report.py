@@ -237,3 +237,136 @@ def generate_html_report(company: str, analysis: Dict, output_path: str):
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
+
+
+def generate_comparison_html(companies: list, all_analyses: dict, output_path: str):
+    """Generate side-by-side HTML comparison report."""
+
+    COLORS = ["#3b82f6", "#06d6a0", "#f59e0b", "#f87171", "#a78bfa"]
+
+    def score_color(score):
+        if score >= 7: return "#22c55e"
+        if score >= 5: return "#f59e0b"
+        return "#ef4444"
+
+    # Build dimension rows
+    dim_rows = ""
+    for key, label in DIMENSION_LABELS.items():
+        dim_rows += f'<tr><td class="dim-name">{label}</td>'
+        for i, company in enumerate(companies):
+            analysis = all_analyses.get(company, {})
+            dim = analysis.get(key, {})
+            score = dim.get("score", 0) if isinstance(dim, dict) else 0
+            summary = dim.get("summary", "") if isinstance(dim, dict) else ""
+            color = score_color(score)
+            pct = score * 10
+            dim_rows += f'''<td class="score-cell">
+              <div class="score-num" style="color:{color}">{score}/10</div>
+              <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:{pct}%;background:{color}"></div></div>
+              <div class="score-summary">{summary}</div>
+            </td>'''
+        dim_rows += "</tr>"
+
+    # Overall averages row
+    dim_rows += '<tr class="avg-row"><td class="dim-name"><strong>Overall Avg</strong></td>'
+    best_company = None
+    best_avg = 0
+    avgs = {}
+    for company in companies:
+        analysis = all_analyses.get(company, {})
+        scores = [analysis.get(k, {}).get("score", 0) for k in DIMENSION_LABELS if isinstance(analysis.get(k, {}), dict)]
+        avg = round(sum(scores) / len(scores), 1) if scores else 0
+        avgs[company] = avg
+        if avg > best_avg:
+            best_avg = avg
+            best_company = company
+
+    for company in companies:
+        avg = avgs[company]
+        color = score_color(avg)
+        crown = " 🏆" if company == best_company else ""
+        dim_rows += f'<td class="score-cell"><div class="score-num" style="color:{color}"><strong>{avg}{crown}</strong></div></td>'
+    dim_rows += "</tr>"
+
+    # Verdicts
+    verdict_cards = ""
+    for i, company in enumerate(companies):
+        analysis = all_analyses.get(company, {})
+        verdict = analysis.get("overall_verdict", "No data available.")
+        red = "".join(f'<div class="flag flag-red">✗ {f}</div>' for f in analysis.get("red_flags", []))
+        green = "".join(f'<div class="flag flag-green">✓ {f}</div>' for f in analysis.get("green_flags", []))
+        color = COLORS[i % len(COLORS)]
+        verdict_cards += f'''
+        <div class="verdict-card">
+          <div class="verdict-company" style="color:{color}">{company}</div>
+          <div class="verdict-text">{verdict}</div>
+          <div class="flags-mini">{green}{red}</div>
+        </div>'''
+
+    # Company header columns
+    company_headers = "".join(
+        f'<th style="color:{COLORS[i % len(COLORS)]}">{c}</th>'
+        for i, c in enumerate(companies)
+    )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Culture Comparison: {' vs '.join(companies)}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {{ --bg:#080e1a; --surface:#0d1629; --border:#1a2540; --text:#e2e8f0; --muted:#64748b; --mono:'DM Mono',monospace; --sans:'DM Sans',sans-serif; }}
+  *{{box-sizing:border-box;margin:0;padding:0;}}
+  body{{background:var(--bg);color:var(--text);font-family:var(--sans);font-weight:300;padding:40px 24px;}}
+  body::before{{content:'';position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(59,130,246,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(59,130,246,.03) 1px,transparent 1px);background-size:48px 48px;}}
+  .container{{max-width:1100px;margin:0 auto;position:relative;}}
+  .tag{{font-family:var(--mono);font-size:.72rem;letter-spacing:.15em;color:#06d6a0;border:1px solid rgba(6,214,160,.3);padding:4px 12px;border-radius:20px;display:inline-block;margin-bottom:16px;}}
+  h1{{font-family:var(--mono);font-size:2rem;font-weight:400;margin-bottom:8px;}}
+  .meta{{font-family:var(--mono);font-size:.78rem;color:var(--muted);margin-bottom:48px;}}
+  .section-title{{font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;color:#3b82f6;margin-bottom:20px;text-transform:uppercase;}}
+  table{{width:100%;border-collapse:collapse;margin-bottom:48px;}}
+  th{{font-family:var(--mono);font-size:.85rem;padding:14px 16px;text-align:center;border-bottom:2px solid var(--border);}}
+  th:first-child{{text-align:left;color:var(--muted);}}
+  td{{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:top;}}
+  .dim-name{{font-size:.9rem;color:var(--text);white-space:nowrap;}}
+  .score-cell{{text-align:center;}}
+  .score-num{{font-family:var(--mono);font-size:1.1rem;margin-bottom:6px;}}
+  .mini-bar-bg{{background:#1a2540;border-radius:3px;height:4px;margin:0 auto 6px;max-width:80px;}}
+  .mini-bar-fill{{height:4px;border-radius:3px;}}
+  .score-summary{{font-size:.72rem;color:var(--muted);line-height:1.4;max-width:180px;margin:0 auto;}}
+  .avg-row td{{border-top:2px solid var(--border);padding-top:16px;}}
+  .verdicts{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:48px;}}
+  .verdict-card{{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;}}
+  .verdict-company{{font-family:var(--mono);font-size:1rem;font-weight:500;margin-bottom:12px;}}
+  .verdict-text{{font-size:.85rem;color:#cbd5e1;line-height:1.7;margin-bottom:16px;}}
+  .flags-mini{{display:flex;flex-direction:column;gap:6px;}}
+  .flag{{font-size:.78rem;padding:5px 10px;border-radius:5px;}}
+  .flag-red{{background:rgba(239,68,68,.1);color:#fca5a5;border:1px solid rgba(239,68,68,.2);}}
+  .flag-green{{background:rgba(34,197,94,.1);color:#86efac;border:1px solid rgba(34,197,94,.2);}}
+  .footer{{font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:48px;padding-top:24px;border-top:1px solid var(--border);}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="tag">culture comparison</div>
+  <h1>{' vs '.join(companies)}</h1>
+  <div class="meta">Generated by company-culture-analyzer · Data from Reddit, Glassdoor &amp; Indeed</div>
+
+  <div class="section-title">Score Comparison</div>
+  <table>
+    <thead><tr><th>Dimension</th>{company_headers}</tr></thead>
+    <tbody>{dim_rows}</tbody>
+  </table>
+
+  <div class="section-title">Verdicts</div>
+  <div class="verdicts">{verdict_cards}</div>
+
+  <div class="footer">Results based on public employee discussions. May not reflect current conditions.</div>
+</div>
+</body>
+</html>"""
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(html)
