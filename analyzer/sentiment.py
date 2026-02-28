@@ -19,7 +19,7 @@ except ImportError:
 
 API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
-INTERVIEW_SOURCES = {"glassdoor_interview", "leetcode_discuss", "1point3acres_interview"}
+INTERVIEW_SOURCES = {"glassdoor_interview", "leetcode_discuss", "1point3acres_interview", "leetcode_discuss_full", "1point3acres_full"}
 
 TOPIC_KEYWORDS = {
     "work_life_balance": [

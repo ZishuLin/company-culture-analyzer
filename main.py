@@ -52,7 +52,7 @@ def analyze(company, output, limit, no_html, no_reddit):
     from scrapers.reddit import scrape_reddit, scrape_reddit_company_sub
     from scrapers.glassdoor import scrape_glassdoor_snippets, scrape_indeed_reviews
     from scrapers.yimusan import scrape_yimusan, scrape_yimusan_interview
-    from scrapers.interview_sources import scrape_interview_data
+    from scrapers.interview_sources import scrape_interview_data, scrape_full_interview_posts
     from analyzer.sentiment import analyze_company
     from report import print_terminal_report, generate_html_report
 
@@ -138,6 +138,16 @@ def analyze(company, output, limit, no_html, no_reddit):
             progress.update(task, description=f"[red]✗ Interview data error: {e}[/red]")
         progress.stop_task(task)
 
+        task = progress.add_task("Fetching full interview posts (detailed questions)...", total=None)
+        try:
+            full_posts = scrape_full_interview_posts(company)
+            all_posts.extend(full_posts)
+            lc_full = sum(1 for p in full_posts if p["source"] == "leetcode_discuss_full")
+            progress.update(task, description=f"[green]✓ LeetCode full posts: {lc_full}[/green]")
+        except Exception as e:
+            progress.update(task, description=f"[red]✗ Full posts error: {e}[/red]")
+        progress.stop_task(task)
+
         task = progress.add_task("Analyzing with AI...", total=None)
         analysis = analyze_company(company, all_posts)
         ai_used = analysis.get("metadata", {}).get("used_ai", False)
@@ -172,7 +182,7 @@ def compare(companies, no_reddit, output):
     from scrapers.reddit import scrape_reddit, scrape_reddit_company_sub
     from scrapers.glassdoor import scrape_glassdoor_snippets, scrape_indeed_reviews
     from scrapers.yimusan import scrape_yimusan, scrape_yimusan_interview
-    from scrapers.interview_sources import scrape_interview_data
+    from scrapers.interview_sources import scrape_interview_data, scrape_full_interview_posts
     from analyzer.sentiment import analyze_company
     from report import print_terminal_report, generate_comparison_html
 
@@ -234,6 +244,15 @@ def compare(companies, no_reddit, output):
                 progress.update(task, description=f"[green]✓ Interview data: {len(iv_data)} posts[/green]")
             except Exception as e:
                 progress.update(task, description=f"[red]✗ Interview data: {e}[/red]")
+            progress.stop_task(task)
+
+            task = progress.add_task("Full interview posts...", total=None)
+            try:
+                full_posts = scrape_full_interview_posts(company)
+                all_posts.extend(full_posts)
+                progress.update(task, description=f"[green]✓ Full posts: {len(full_posts)}[/green]")
+            except Exception as e:
+                progress.update(task, description=f"[red]✗ Full posts: {e}[/red]")
             progress.stop_task(task)
 
             task = progress.add_task("Analyzing...", total=None)
