@@ -51,7 +51,8 @@ def analyze(company, output, limit, no_html, no_reddit):
     """
     from scrapers.reddit import scrape_reddit, scrape_reddit_company_sub
     from scrapers.glassdoor import scrape_glassdoor_snippets, scrape_indeed_reviews
-    from scrapers.yimusan import scrape_yimusan
+    from scrapers.yimusan import scrape_yimusan, scrape_yimusan_interview
+    from scrapers.interview_sources import scrape_interview_data
     from analyzer.sentiment import analyze_company
     from report import print_terminal_report, generate_html_report
 
@@ -117,6 +118,26 @@ def analyze(company, output, limit, no_html, no_reddit):
             progress.update(task, description=f"[red]✗ 一亩三分地 error: {e}[/red]")
         progress.stop_task(task)
 
+        task = progress.add_task("Fetching 一亩三分地面经...", total=None)
+        try:
+            yms_iv = scrape_yimusan_interview(company)
+            all_posts.extend(yms_iv)
+            progress.update(task, description=f"[green]✓ 面经: {len(yms_iv)} posts[/green]")
+        except Exception as e:
+            progress.update(task, description=f"[red]✗ 面经 error: {e}[/red]")
+        progress.stop_task(task)
+
+        task = progress.add_task("Fetching Glassdoor interviews + LeetCode...", total=None)
+        try:
+            iv_data = scrape_interview_data(company)
+            all_posts.extend(iv_data)
+            gd_iv = sum(1 for p in iv_data if p["source"] == "glassdoor_interview")
+            lc_iv = sum(1 for p in iv_data if p["source"] == "leetcode_discuss")
+            progress.update(task, description=f"[green]✓ Glassdoor interviews: {gd_iv} · LeetCode: {lc_iv}[/green]")
+        except Exception as e:
+            progress.update(task, description=f"[red]✗ Interview data error: {e}[/red]")
+        progress.stop_task(task)
+
         task = progress.add_task("Analyzing with AI...", total=None)
         analysis = analyze_company(company, all_posts)
         ai_used = analysis.get("metadata", {}).get("used_ai", False)
@@ -150,7 +171,8 @@ def compare(companies, no_reddit, output):
     load_dotenv(Path(__file__).parent / ".env", override=True)
     from scrapers.reddit import scrape_reddit, scrape_reddit_company_sub
     from scrapers.glassdoor import scrape_glassdoor_snippets, scrape_indeed_reviews
-    from scrapers.yimusan import scrape_yimusan
+    from scrapers.yimusan import scrape_yimusan, scrape_yimusan_interview
+    from scrapers.interview_sources import scrape_interview_data
     from analyzer.sentiment import analyze_company
     from report import print_terminal_report, generate_comparison_html
 
@@ -194,6 +216,24 @@ def compare(companies, no_reddit, output):
                 progress.update(task, description=f"[green]✓ 一亩三分地: {len(yms)} posts[/green]")
             except Exception as e:
                 progress.update(task, description=f"[red]✗ 一亩三分地: {e}[/red]")
+            progress.stop_task(task)
+
+            task = progress.add_task("Fetching 面经...", total=None)
+            try:
+                yms_iv = scrape_yimusan_interview(company)
+                all_posts.extend(yms_iv)
+                progress.update(task, description=f"[green]✓ 面经: {len(yms_iv)} posts[/green]")
+            except Exception as e:
+                progress.update(task, description=f"[red]✗ 面经: {e}[/red]")
+            progress.stop_task(task)
+
+            task = progress.add_task("Glassdoor interviews + LeetCode...", total=None)
+            try:
+                iv_data = scrape_interview_data(company)
+                all_posts.extend(iv_data)
+                progress.update(task, description=f"[green]✓ Interview data: {len(iv_data)} posts[/green]")
+            except Exception as e:
+                progress.update(task, description=f"[red]✗ Interview data: {e}[/red]")
             progress.stop_task(task)
 
             task = progress.add_task("Analyzing...", total=None)

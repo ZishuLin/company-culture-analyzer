@@ -1,6 +1,6 @@
 """
-一亩三分地爬虫 - 搜索公司相关的面经、工作体验帖子
-网站: https://www.1point3acres.com/bbs/
+1point3acres scraper - searches for company interview experiences and work culture posts
+Site: https://www.1point3acres.com/bbs/
 """
 
 import os
@@ -8,7 +8,7 @@ import requests
 import time
 import random
 from bs4 import BeautifulSoup
-from typing import List, Dict, Optional
+from typing import List, Dict
 from pathlib import Path
 
 try:
@@ -27,7 +27,6 @@ HEADERS = {
 
 BASE_URL = "https://www.1point3acres.com/bbs"
 
-# 常见公司中英文对照表
 COMPANY_ALIASES = {
     "google": ["谷歌", "Google"],
     "meta": ["脸书", "Meta", "Facebook", "FB"],
@@ -71,28 +70,26 @@ COMPANY_ALIASES = {
     "sap": ["SAP"],
 }
 
+# Interview-specific search keywords
+INTERVIEW_KEYWORDS = ["面经", "interview", "OA", "onsite", "intern 面经", "SDE 面经"]
+
 
 def get_search_terms(company: str) -> List[str]:
-    """获取公司的所有搜索词（英文+中文别名）。"""
     key = company.lower().strip()
     aliases = COMPANY_ALIASES.get(key, [company])
-    # 确保原始名字也在列表里
     if company not in aliases:
         aliases = [company] + aliases
     return aliases
 
 
-
-
 def translate_to_english(texts: List[str]) -> List[str]:
-    """Use Gemini to translate Chinese text to English."""
+    """Use Gemini to translate Chinese text to English. Returns originals if no API key."""
     key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not key:
-        return texts  # Return original if no key
+        return texts
 
-    # Filter texts that need translation (contain Chinese characters)
     def has_chinese(text):
-        return any('一' <= c <= '鿿' for c in text)
+        return any('\u4e00' <= c <= '\u9fff' for c in text)
 
     indices_to_translate = [i for i, t in enumerate(texts) if has_chinese(t)]
     if not indices_to_translate:
@@ -102,7 +99,7 @@ def translate_to_english(texts: List[str]) -> List[str]:
     batch = [texts[i] for i in indices_to_translate]
     combined = "\n---\n".join(batch[:20])
 
-    prompt = f"""Translate the following Chinese texts to English. 
+    prompt = f"""Translate the following Chinese texts to English.
 Return ONLY the translations separated by "---", in the same order.
 Do not add any explanation or numbering.
 
@@ -121,36 +118,37 @@ Do not add any explanation or numbering.
         resp.raise_for_status()
         translated_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
         translations = [t.strip() for t in translated_text.split("---")]
-
         for i, idx in enumerate(indices_to_translate[:len(translations)]):
             result[idx] = translations[i]
     except Exception:
-        pass  # Return originals on error
+        pass
 
     return result
 
+
 def scrape_yimusan(company: str, limit: int = 20) -> List[Dict]:
-    """搜索一亩三分地上关于某公司的帖子。"""
+    """Search 1point3acres for work culture posts about a company."""
     posts = []
     seen_urls = set()
     search_terms = get_search_terms(company)
 
-    # 优先用SerpAPI（更稳定）
-    serp_posts = _serpapi_yimusan(company, search_terms)
-    posts.extend(serp_posts)
-    seen_urls.update(p["url"] for p in serp_posts)
+    # Search general posts via SerpAPI
+    serp_posts = _serpapi_yimusan(company, search_terms, interview_mode=False)
+    for p in serp_posts:
+        if p["url"] not in seen_urls:
+            posts.append(p)
+            seen_urls.add(p["url"])
 
-    # 如果SerpAPI结果不够，直接爬搜索页
+    # Direct search as fallback
     if len(posts) < 5:
         for term in search_terms[:2]:
-            if len(posts) >= limit:
-                break
             direct = _direct_search(term, company, seen_urls)
-            posts.extend(direct)
-            seen_urls.update(p["url"] for p in direct)
+            for p in direct:
+                posts.append(p)
+                seen_urls.add(p["url"])
             time.sleep(random.uniform(1.5, 2.5))
 
-    # Translate Chinese posts to English
+    # Translate Chinese content to English
     if posts:
         texts = [p["text"] for p in posts]
         translated = translate_to_english(texts)
@@ -160,46 +158,89 @@ def scrape_yimusan(company: str, limit: int = 20) -> List[Dict]:
     return posts[:limit]
 
 
-def _serpapi_yimusan(company: str, search_terms: List[str]) -> List[Dict]:
-    """通过SerpAPI搜索一亩三分地。"""
+def scrape_yimusan_interview(company: str, limit: int = 15) -> List[Dict]:
+    """Search 1point3acres specifically for interview experience posts."""
+    posts = []
+    seen_urls = set()
+    search_terms = get_search_terms(company)
+
+    # Search using interview-specific keywords
+    serp_posts = _serpapi_yimusan(company, search_terms, interview_mode=True)
+    for p in serp_posts:
+        if p["url"] not in seen_urls:
+            p["source"] = "1point3acres_interview"
+            posts.append(p)
+            seen_urls.add(p["url"])
+
+    # Direct search as fallback
+    if len(posts) < 5:
+        for term in search_terms[:1]:
+            for kw in INTERVIEW_KEYWORDS[:2]:
+                query = f"{term} {kw}"
+                direct = _direct_search(query, company, seen_urls)
+                for p in direct:
+                    p["source"] = "1point3acres_interview"
+                    posts.append(p)
+                    seen_urls.add(p["url"])
+                time.sleep(random.uniform(1.5, 2.0))
+
+    # Translate Chinese content to English
+    if posts:
+        texts = [p["text"] for p in posts]
+        translated = translate_to_english(texts)
+        for i, post in enumerate(posts):
+            post["text"] = translated[i]
+
+    return posts[:limit]
+
+
+def _serpapi_yimusan(company: str, search_terms: List[str], interview_mode: bool = False) -> List[Dict]:
     key = os.environ.get("SERPAPI_KEY", "").strip()
     if not key:
         return []
 
     results = []
-    # 用最多2个搜索词
-    for term in search_terms[:2]:
-        query = f'site:1point3acres.com "{term}"'
-        try:
-            resp = requests.get(
-                "https://serpapi.com/search",
-                params={"q": query, "api_key": key, "num": 8, "engine": "google"},
-                timeout=15,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            for item in data.get("organic_results", []):
-                snippet = item.get("snippet", "")
-                title = item.get("title", "")
-                link = item.get("link", "")
-                if snippet and link:
-                    results.append({
-                        "source": "1point3acres",
-                        "title": title,
-                        "text": f"{title}. {snippet}",
-                        "url": link,
-                        "score": 0,
-                        "comments": [],
-                    })
-            time.sleep(1)
-        except Exception:
-            continue
+    terms_to_search = search_terms[:2]
+
+    for term in terms_to_search:
+        if interview_mode:
+            queries = [
+                f'site:1point3acres.com "{term}" 面经',
+                f'site:1point3acres.com "{term}" interview experience',
+            ]
+        else:
+            queries = [f'site:1point3acres.com "{term}"']
+
+        for query in queries:
+            try:
+                resp = requests.get(
+                    "https://serpapi.com/search",
+                    params={"q": query, "api_key": key, "num": 8, "engine": "google"},
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                for item in data.get("organic_results", []):
+                    snippet = item.get("snippet", "")
+                    title = item.get("title", "")
+                    link = item.get("link", "")
+                    if snippet and link:
+                        results.append({
+                            "source": "1point3acres",
+                            "title": title,
+                            "text": f"{title}. {snippet}",
+                            "url": link,
+                            "score": 0,
+                            "comments": [],
+                        })
+                time.sleep(1)
+            except Exception:
+                continue
 
     return results
 
 
 def _direct_search(term: str, company: str, seen_urls: set) -> List[Dict]:
-    """直接爬一亩三分地搜索页。"""
     posts = []
     try:
         search_url = f"{BASE_URL}/search.php?searchsubmit=yes&srchtxt={requests.utils.quote(term)}&srchtype=1"
