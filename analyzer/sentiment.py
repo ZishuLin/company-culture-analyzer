@@ -17,7 +17,7 @@ try:
 except ImportError:
     pass
 
-API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 INTERVIEW_SOURCES = {"glassdoor_interview", "leetcode_discuss", "1point3acres_interview", "leetcode_discuss_full", "1point3acres_full"}
 
@@ -102,11 +102,11 @@ def analyze_with_gemini(company: str, texts: List[str], all_posts: List[Dict] = 
 === EMPLOYEE REVIEWS (work culture, compensation, management, career) ===
 {general_section[:3500]}
 
-=== INTERVIEW EXPERIENCES (rounds, difficulty, OA, H1B, pair programming) ===
-{interview_section[:2000]}
+=== INTERVIEW EXPERIENCES (full posts from LeetCode, Glassdoor, 1point3acres) ===
+{interview_section[:3000]}
 
 Based on ALL the above, return ONLY this JSON structure with no markdown:
-{{"work_life_balance":{{"score":7,"summary":"one sentence based on reviews","evidence":["example1","example2"]}},"management":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"career_growth":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"compensation":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"culture":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"interview":{{"score":7,"summary":"describe rounds, difficulty, OA, H1B if available","evidence":["example1","example2"]}},"overall_verdict":"2-3 sentence summary","red_flags":["concern1","concern2"],"green_flags":["positive1","positive2"],"data_quality":"medium"}}"""
+{{"work_life_balance":{{"score":7,"summary":"one sentence based on reviews","evidence":["example1","example2"]}},"management":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"career_growth":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"compensation":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"culture":{{"score":7,"summary":"one sentence","evidence":["example1","example2"]}},"interview":{{"score":7,"summary":"List specific rounds and question types found in interview posts. Include OA difficulty, pair programming details, system design topics if mentioned.","evidence":["specific round or question type from interview data","another detail"]}},"overall_verdict":"2-3 sentence summary","red_flags":["concern1","concern2"],"green_flags":["positive1","positive2"],"data_quality":"medium"}}"""
 
     try:
         resp = requests.post(
