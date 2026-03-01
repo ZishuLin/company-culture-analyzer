@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Company Culture Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080b14;
+    --surface: #0d1120;
+    --surface2: #131929;
+    --border: #1e2840;
+    --accent: #6366f1;
+    --accent2: #a78bfa;
+    --accent3: #38bdf8;
+    --green: #4ade80;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --dim: #94a3b8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    padding: 3rem 0 2rem;
+    text-align: center;
+  }
+
+  .logo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 100px;
+    padding: .3rem .9rem;
+    font-family: 'DM Mono', monospace;
+    font-size: .75rem;
+    color: var(--accent2);
+    margin-bottom: 1.5rem;
+    letter-spacing: .05em;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 800;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #e2e8f0 0%, #a78bfa 50%, #38bdf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: .75rem;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 1rem;
+    max-width: 500px;
+    margin: 0 auto 2.5rem;
+    line-height: 1.6;
+  }
+
+  /* Search box */
+  .search-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: border-color .2s;
+  }
+
+  .search-wrap:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+  }
+
+  .search-row {
+    display: flex;
+    gap: .75rem;
+    align-items: center;
+  }
+
+  .search-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: .85rem 1.1rem;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 600;
+    outline: none;
+    transition: border-color .2s;
+  }
+
+  .search-input::placeholder { color: var(--muted); font-weight: 400; }
+  .search-input:focus { border-color: var(--accent); }
+
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: .85rem 1.6rem;
+    font-family: 'Syne', sans-serif;
+    font-size: .95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s, transform .1s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { background: #5558e8; }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { background: var(--border); cursor: not-allowed; }
+
+  .options-row {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .85rem;
+    color: var(--dim);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .toggle input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+
+  /* Quick picks */
+  .quick-picks {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin-bottom: 2.5rem;
+    justify-content: center;
+  }
+
+  .pick-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: .3rem .9rem;
+    font-size: .82rem;
+    color: var(--dim);
+    cursor: pointer;
+    transition: all .15s;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .pick-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent2);
+    background: rgba(99,102,241,0.08);
+  }
+
+  /* Loading */
+  #loading {
+    display: none;
+    text-align: center;
+    padding: 3rem;
+  }
+
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: .85rem;
+  }
+
+  .loading-steps { margin-top: 1rem; display: flex; flex-direction: column; gap: .4rem; align-items: center; }
+
+  .step {
+    font-family: 'DM Mono', monospace;
+    font-size: .78rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    opacity: 0;
+    transition: opacity .3s;
+  }
+
+  .step.active { opacity: 1; color: var(--dim); }
+  .step.done { opacity: 1; color: var(--green); }
+  .step-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* Error */
+  #error-box {
+    display: none;
+    background: rgba(248,113,113,0.08);
+    border: 1px solid rgba(248,113,113,0.3);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    color: var(--red);
+    font-size: .9rem;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Results */
+  #results { display: none; }
+
+  .company-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .company-avatar {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .company-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+  }
+
+  .company-meta {
+    color: var(--muted);
+    font-size: .82rem;
+    font-family: 'DM Mono', monospace;
+    margin-top: .2rem;
+  }
+
+  .quality-badge {
+    margin-left: auto;
+    padding: .3rem .8rem;
+    border-radius: 100px;
+    font-size: .75rem;
+    font-family: 'DM Mono', monospace;
+    border: 1px solid;
+  }
+
+  .quality-high { color: var(--green); border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.07); }
+  .quality-medium { color: var(--yellow); border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.07); }
+  .quality-low { color: var(--red); border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.07); }
+
+  /* Score grid */
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .score-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.1rem 1.25rem;
+    transition: border-color .2s;
+  }
+
+  .score-card:hover { border-color: rgba(99,102,241,0.4); }
+
+  .score-label {
+    font-size: .78rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: .6rem;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .score-row {
+    display: flex;
+    align-items: baseline;
+    gap: .4rem;
+    margin-bottom: .6rem;
+  }
+
+  .score-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .score-denom { color: var(--muted); font-size: .85rem; }
+
+  .score-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: .7rem;
+  }
+
+  .score-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s cubic-bezier(.4,0,.2,1);
+  }
+
+  .score-summary {
+    font-size: .82rem;
+    color: var(--dim);
+    line-height: 1.5;
+  }
+
+  /* Verdict */
+  .verdict-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .verdict-label {
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--accent2);
+    font-family: 'DM Mono', monospace;
+    margin-bottom: .5rem;
+  }
+
+  .verdict-text {
+    color: var(--text);
+    line-height: 1.7;
+    font-size: .95rem;
+  }
+
+  /* Flags */
+  .flags-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  @media (max-width: 600px) { .flags-grid { grid-template-columns: 1fr; } }
+
+  .flags-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.1rem 1.25rem;
+  }
+
+  .flags-title {
+    font-size: .78rem;
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: .8rem;
+  }
+
+  .flags-title.red { color: var(--red); }
+  .flags-title.green { color: var(--green); }
+
+  .flag-item {
+    display: flex;
+    gap: .6rem;
+    font-size: .85rem;
+    color: var(--dim);
+    line-height: 1.5;
+    margin-bottom: .5rem;
+  }
+
+  .flag-icon { flex-shrink: 0; margin-top: .1rem; }
+
+  /* Interview section */
+  .interview-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+
+  .interview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .85rem;
+  }
+
+  .interview-table th {
+    text-align: left;
+    padding: .5rem .75rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+
+  .interview-table td {
+    padding: .65rem .75rem;
+    border-bottom: 1px solid rgba(30,40,64,0.6);
+    color: var(--dim);
+    line-height: 1.5;
+    vertical-align: top;
+  }
+
+  .interview-table tr:last-child td { border-bottom: none; }
+
+  .round-name {
+    font-family: 'DM Mono', monospace;
+    color: var(--accent2);
+    font-size: .82rem;
+    white-space: nowrap;
+  }
+
+  .type-badge {
+    display: inline-block;
+    padding: .15rem .5rem;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: .72rem;
+    background: rgba(99,102,241,0.12);
+    color: var(--accent2);
+    border: 1px solid rgba(99,102,241,0.2);
+  }
+
+  .type-badge.coding { background: rgba(74,222,128,0.08); color: var(--green); border-color: rgba(74,222,128,0.2); }
+  .type-badge.system_design { background: rgba(56,189,248,0.08); color: var(--accent3); border-color: rgba(56,189,248,0.2); }
+  .type-badge.behavioral { background: rgba(251,191,36,0.08); color: var(--yellow); border-color: rgba(251,191,36,0.2); }
+  .type-badge.sql { background: rgba(167,139,250,0.08); color: var(--accent2); border-color: rgba(167,139,250,0.2); }
+  .type-badge.ml { background: rgba(56,189,248,0.08); color: var(--accent3); border-color: rgba(56,189,248,0.2); }
+
+  /* Sources */
+  .sources-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    margin-bottom: 2rem;
+  }
+
+  .source-tag {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .2rem .6rem;
+    font-family: 'DM Mono', monospace;
+    font-size: .72rem;
+    color: var(--muted);
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 3rem 0 2rem;
+    color: var(--muted);
+    font-size: .8rem;
+    font-family: 'DM Mono', monospace;
+  }
+
+  footer a { color: var(--accent2); text-decoration: none; }
+
+  /* Animation */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-up { animation: fadeUp .4s ease both; }
+  .fade-up-2 { animation: fadeUp .4s .1s ease both; }
+  .fade-up-3 { animation: fadeUp .4s .2s ease both; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo-badge">
+      <span>⬡</span>
+      <span>company-culture-analyzer</span>
+    </div>
+    <h1>Know Before You Go</h1>
+    <p class="subtitle">AI-powered culture analysis from Glassdoor, Indeed, Reddit, LeetCode & 一亩三分地 — all in one place.</p>
+
+    <div class="search-wrap">
+      <div class="search-row">
+        <input
+          class="search-input"
+          id="company-input"
+          type="text"
+          placeholder="e.g. Shopify, Stripe, Google..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="btn" id="analyze-btn" onclick="runAnalysis()">Analyze →</button>
+      </div>
+      <div class="options-row">
+        <label class="toggle">
+          <input type="checkbox" id="no-reddit" checked>
+          Skip Reddit (faster)
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="show-interview" checked>
+          Include interview questions
+        </label>
+      </div>
+    </div>
+
+    <div class="quick-picks">
+      <span style="font-size:.8rem;color:var(--muted);margin-right:.25rem;align-self:center">Try:</span>
+      <button class="pick-btn" onclick="setCompany('Shopify')">Shopify</button>
+      <button class="pick-btn" onclick="setCompany('Stripe')">Stripe</button>
+      <button class="pick-btn" onclick="setCompany('Google')">Google</button>
+      <button class="pick-btn" onclick="setCompany('Microsoft')">Microsoft</button>
+      <button class="pick-btn" onclick="setCompany('Airbnb')">Airbnb</button>
+      <button class="pick-btn" onclick="setCompany('OpenAI')">OpenAI</button>
+      <button class="pick-btn" onclick="setCompany('Databricks')">Databricks</button>
+    </div>
+  </header>
+
+  <!-- Loading -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Gathering data from multiple sources...</div>
+    <div class="loading-steps">
+      <div class="step" id="step-glassdoor"><span class="step-dot"></span>Scraping Glassdoor reviews</div>
+      <div class="step" id="step-indeed"><span class="step-dot"></span>Scraping Indeed reviews</div>
+      <div class="step" id="step-reddit"><span class="step-dot"></span>Fetching Reddit posts</div>
+      <div class="step" id="step-yimusan"><span class="step-dot"></span>Searching 一亩三分地</div>
+      <div class="step" id="step-leetcode"><span class="step-dot"></span>Fetching LeetCode interview posts</div>
+      <div class="step" id="step-ai"><span class="step-dot"></span>Running AI analysis</div>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="error-box"></div>
+
+  <!-- Results -->
+  <div id="results"></div>
+
+  <footer>
+    <p>Data sourced from Glassdoor · Indeed · Reddit · LeetCode · 一亩三分地</p>
+    <p style="margin-top:.4rem">Run locally: <a href="https://github.com/ZishuLin/company-culture-analyzer" target="_blank">github.com/ZishuLin/company-culture-analyzer</a></p>
+  </footer>
+</div>
+
+<script>
+const DIMENSION_LABELS = {
+  work_life_balance: 'Work-Life Balance',
+  management: 'Management Quality',
+  career_growth: 'Career Growth',
+  compensation: 'Compensation',
+  culture: 'Culture & Inclusion',
+  interview: 'Interview Process',
+};
+
+function setCompany(name) {
+  document.getElementById('company-input').value = name;
+  document.getElementById('company-input').focus();
+}
+
+document.getElementById('company-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') runAnalysis();
+});
+
+function scoreColor(score) {
+  if (score >= 7) return '#4ade80';
+  if (score >= 5) return '#fbbf24';
+  return '#f87171';
+}
+
+// Fake data generator for demo purposes (since we can't call Python backend from browser)
+function generateDemoData(company) {
+  const seed = company.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  const rand = (min, max, offset = 0) => {
+    const x = Math.sin(seed + offset) * 10000;
+    const r = x - Math.floor(x);
+    return Math.round(min + r * (max - min));
+  };
+
+  const wlb = rand(4, 8, 1);
+  const mgmt = rand(3, 8, 2);
+  const growth = rand(3, 8, 3);
+  const comp = rand(3, 9, 4);
+  const culture = rand(3, 8, 5);
+  const interview = rand(5, 9, 6);
+
+  const summaries = {
+    work_life_balance: wlb >= 6
+      ? `${company} generally offers good work-life balance, with flexible remote policies and reasonable hours.`
+      : `Many employees report high stress and long hours at ${company}, though some teams are better than others.`,
+    management: mgmt >= 6
+      ? `Management at ${company} is generally regarded as supportive and transparent.`
+      : `Management has room for improvement — some employees cite lack of clarity and inconsistent leadership decisions.`,
+    career_growth: growth >= 6
+      ? `Strong growth opportunities exist at ${company} for those who seek them out.`
+      : `Career progression can be slow; promotions are competitive and often limited.`,
+    compensation: comp >= 7
+      ? `${company} offers above-market compensation with strong equity packages.`
+      : `Pay is below market for some roles; equity dilution and below-average raises are common concerns.`,
+    culture: culture >= 6
+      ? `The culture at ${company} is described as collaborative and inclusive by most employees.`
+      : `Cultural fit is polarizing — fast-paced and chaotic for some, energizing for others.`,
+    interview: `Interview process typically involves: ${interview >= 7 ? 'OA → Phone Screen → 3-round onsite with system design and coding' : 'Phone Screen → 2-round technical'}.`,
+  };
+
+  const allRedFlags = [
+    'Compensation below market rate',
+    'High turnover in engineering',
+    'Frequent reorgs and direction changes',
+    'Limited upward mobility',
+    'Work-life balance issues in certain teams',
+    'Management lacks technical depth',
+  ];
+  const allGreenFlags = [
+    'Smart and collaborative colleagues',
+    'Strong brand and resume booster',
+    'Good benefits and perks',
+    'Remote-friendly culture',
+    'Challenging and meaningful work',
+    'Fast-paced learning environment',
+  ];
+
+  const redFlags = allRedFlags.filter((_, i) => rand(0, 1, i + 10) === 0).slice(0, 3);
+  const greenFlags = allGreenFlags.filter((_, i) => rand(0, 1, i + 20) === 1).slice(0, 3);
+
+  const interviewQs = [
+    { round: 'OA', question: 'Shopping cart with discount strategies (buy-one-get-one, bulk discounts)', type: 'coding', difficulty: 'easy', result: 'passed' },
+    { round: 'Phone Screen', question: 'Implement a rate limiter with configurable window and threshold', type: 'coding', difficulty: 'medium', result: 'passed' },
+    { round: 'Pair Programming', question: 'TDD: build a feature with tests first, emphasis on code quality and communication', type: 'coding', difficulty: 'medium', result: 'unknown' },
+    { round: 'System Design', question: 'Design a notification system at scale (push, email, SMS)', type: 'system_design', difficulty: 'hard', result: 'unknown' },
+    { round: 'Behavioral', question: 'Tell me about a time you disagreed with a technical decision and how you handled it', type: 'behavioral', difficulty: '', result: 'unknown' },
+  ].filter((_, i) => rand(0, 1, i + 30) >= 0).slice(0, 4);
+
+  return {
+    work_life_balance: { score: wlb, summary: summaries.work_life_balance, evidence: [] },
+    management: { score: mgmt, summary: summaries.management, evidence: [] },
+    career_growth: { score: growth, summary: summaries.career_growth, evidence: [] },
+    compensation: { score: comp, summary: summaries.compensation, evidence: [] },
+    culture: { score: culture, summary: summaries.culture, evidence: [] },
+    interview: { score: interview, summary: summaries.interview, evidence: [] },
+    overall_verdict: `${company} is a complex workplace with distinct strengths and challenges. While it attracts talented people and offers interesting work, prospective employees should carefully evaluate the compensation structure and team culture before committing.`,
+    red_flags: redFlags.length ? redFlags : ['Limited data available'],
+    green_flags: greenFlags.length ? greenFlags : ['See full analysis for details'],
+    data_quality: 'medium',
+    interview_questions: interviewQs,
+    metadata: {
+      company,
+      total_posts: rand(60, 120, 40),
+      sources: {
+        glassdoor: rand(15, 30, 41),
+        indeed_reviews: rand(10, 20, 42),
+        '1point3acres': rand(5, 15, 43),
+        leetcode_discuss: rand(8, 18, 44),
+        leetcode_discuss_full: rand(3, 8, 45),
+      },
+      used_ai: true,
+    }
+  };
+}
+
+async function runAnalysis() {
+  const company = document.getElementById('company-input').value.trim();
+  if (!company) return;
+
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+  btn.textContent = 'Analyzing...';
+
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('error-box').style.display = 'none';
+
+  const steps = ['glassdoor', 'indeed', 'reddit', 'yimusan', 'leetcode', 'ai'];
+  const delays = [800, 1400, 1800, 2400, 3000, 4000];
+
+  steps.forEach((s, i) => {
+    setTimeout(() => {
+      document.getElementById(`step-${s}`).classList.add('active');
+    }, delays[i]);
+    setTimeout(() => {
+      document.getElementById(`step-${s}`).classList.add('done');
+    }, delays[i] + 600);
+  });
+
+  // Simulate analysis delay
+  await new Promise(r => setTimeout(r, 4800));
+
+  // Generate demo data (in production this would call the Python backend)
+  const data = generateDemoData(company);
+
+  document.getElementById('loading').style.display = 'none';
+  renderResults(company, data);
+
+  btn.disabled = false;
+  btn.textContent = 'Analyze →';
+
+  // Reset step states
+  steps.forEach(s => {
+    const el = document.getElementById(`step-${s}`);
+    el.classList.remove('active', 'done');
+  });
+}
+
+function renderResults(company, data) {
+  const meta = data.metadata || {};
+  const sources = meta.sources || {};
+  const totalPosts = meta.total_posts || 0;
+  const quality = data.data_quality || 'medium';
+  const qs = data.interview_questions || [];
+
+  // Score cards
+  let scoreCards = '';
+  for (const [key, label] of Object.entries(DIMENSION_LABELS)) {
+    const dim = data[key] || {};
+    const score = dim.score || 0;
+    const pct = score * 10;
+    const color = scoreColor(score);
+    scoreCards += `
+      <div class="score-card fade-up">
+        <div class="score-label">${label}</div>
+        <div class="score-row">
+          <span class="score-num" style="color:${color}">${score}</span>
+          <span class="score-denom">/10</span>
+        </div>
+        <div class="score-bar">
+          <div class="score-fill" style="width:${pct}%;background:${color}"></div>
+        </div>
+        <div class="score-summary">${dim.summary || '—'}</div>
+      </div>`;
+  }
+
+  // Flags
+  const redFlags = (data.red_flags || []).map(f =>
+    `<div class="flag-item"><span class="flag-icon" style="color:var(--red)">✗</span><span>${f}</span></div>`
+  ).join('');
+  const greenFlags = (data.green_flags || []).map(f =>
+    `<div class="flag-item"><span class="flag-icon" style="color:var(--green)">✓</span><span>${f}</span></div>`
+  ).join('');
+
+  // Interview questions
+  let interviewSection = '';
+  if (qs.length && document.getElementById('show-interview').checked) {
+    const rows = qs.map(q => `
+      <tr>
+        <td><span class="round-name">${q.round || '—'}</span></td>
+        <td>${q.question || ''}</td>
+        <td><span class="type-badge ${q.type || 'coding'}">${q.type || 'coding'}${q.difficulty ? ` · ${q.difficulty}` : ''}</span></td>
+        <td style="color:${q.result === 'passed' ? 'var(--green)' : q.result === 'failed' ? 'var(--red)' : 'var(--muted)'}">
+          ${q.result === 'passed' ? '✓ Passed' : q.result === 'failed' ? '✗ Failed' : '—'}
+        </td>
+      </tr>`).join('');
+    interviewSection = `
+      <div class="interview-section fade-up-3">
+        <div class="section-title">🎯 Interview Questions & Rounds</div>
+        <table class="interview-table">
+          <thead>
+            <tr>
+              <th>Round</th>
+              <th>Question / Task</th>
+              <th>Type</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // Sources
+  const sourceTags = Object.entries(sources).map(([s, n]) =>
+    `<span class="source-tag">${s}: ${n}</span>`
+  ).join('');
+
+  // Quality badge
+  const qualityClass = quality === 'high' ? 'quality-high' : quality === 'medium' ? 'quality-medium' : 'quality-low';
+
+  const html = `
+    <div class="company-header fade-up">
+      <div class="company-avatar">${company[0].toUpperCase()}</div>
+      <div>
+        <div class="company-name">${company}</div>
+        <div class="company-meta">Based on ${totalPosts} posts · AI analysis</div>
+      </div>
+      <div class="quality-badge ${qualityClass}">data: ${quality}</div>
+    </div>
+
+    <div class="score-grid">${scoreCards}</div>
+
+    <div class="verdict-box fade-up-2">
+      <div class="verdict-label">Overall Verdict</div>
+      <div class="verdict-text">${data.overall_verdict || '—'}</div>
+    </div>
+
+    <div class="flags-grid fade-up-2">
+      <div class="flags-box">
+        <div class="flags-title red">⚠ Red Flags</div>
+        ${redFlags || '<div style="color:var(--muted);font-size:.85rem">None identified</div>'}
+      </div>
+      <div class="flags-box">
+        <div class="flags-title green">✓ Green Flags</div>
+        ${greenFlags || '<div style="color:var(--muted);font-size:.85rem">None identified</div>'}
+      </div>
+    </div>
+
+    ${interviewSection}
+
+    <div class="sources-row fade-up-3">
+      <span style="font-size:.75rem;color:var(--muted);align-self:center;font-family:'DM Mono',monospace">Sources:</span>
+      ${sourceTags}
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:2rem;font-size:.82rem;color:var(--muted);line-height:1.6">
+      💡 <strong style="color:var(--dim)">Note:</strong> This demo shows simulated data based on the company name.
+      For real AI-powered analysis using live Glassdoor, Reddit & LeetCode data,
+      <a href="https://github.com/ZishuLin/company-culture-analyzer" style="color:var(--accent2)">run the CLI tool locally</a>.
+    </div>
+  `;
+
+  const resultsEl = document.getElementById('results');
+  resultsEl.innerHTML = html;
+  resultsEl.style.display = 'block';
+  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+</body>
+</html>
