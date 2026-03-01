@@ -50,11 +50,11 @@ def analyze(company, output, limit, no_html, no_reddit):
     Example: python main.py analyze Shopify
     """
     from scrapers.reddit import scrape_reddit, scrape_reddit_company_sub
-    from scrapers.glassdoor import scrape_glassdoor_snippets, scrape_indeed_reviews
+    from scrapers.glassdoor import scrape_glassdoor_snippets, scrape_indeed_reviews, scrape_glassdoor_full_reviews
     from scrapers.yimusan import scrape_yimusan, scrape_yimusan_interview
     from scrapers.interview_sources import scrape_interview_data, scrape_full_interview_posts
-    from analyzer.sentiment import analyze_company
-    from report import print_terminal_report, generate_html_report
+    from analyzer.sentiment import analyze_company, extract_interview_questions
+    from report import print_terminal_report, print_interview_questions, generate_html_report
 
     console.print(f"\n[bold cyan]Company Culture Analyzer[/bold cyan]")
     console.print(f"Target: [yellow]{company}[/yellow]\n")
@@ -98,6 +98,15 @@ def analyze(company, output, limit, no_html, no_reddit):
             progress.update(task, description=f"[green]✓ Glassdoor: {len(gd_reviews)} snippets[/green]")
         except Exception as e:
             progress.update(task, description=f"[red]✗ Glassdoor error: {e}[/red]")
+        progress.stop_task(task)
+
+        task = progress.add_task("Fetching Glassdoor full reviews...", total=None)
+        try:
+            gd_full = scrape_glassdoor_full_reviews(company)
+            all_posts.extend(gd_full)
+            progress.update(task, description=f"[green]✓ Glassdoor full: {len(gd_full)} pages[/green]")
+        except Exception as e:
+            progress.update(task, description=f"[red]✗ Glassdoor full: {e}[/red]")
         progress.stop_task(task)
 
         task = progress.add_task("Fetching Indeed reviews...", total=None)
@@ -155,13 +164,19 @@ def analyze(company, output, limit, no_html, no_reddit):
         progress.update(task, description=f"[green]✓ Analysis complete ({label})[/green]")
         progress.stop_task(task)
 
+        task = progress.add_task("Extracting interview questions...", total=None)
+        interview_questions = extract_interview_questions(company, all_posts)
+        progress.update(task, description=f"[green]✓ Interview questions: {len(interview_questions)} found[/green]")
+        progress.stop_task(task)
+
         if not no_html:
             output_path = output or f"{company.lower().replace(' ', '_')}_culture.html"
             task = progress.add_task("Generating HTML report...", total=None)
-            generate_html_report(company, analysis, output_path)
+            generate_html_report(company, analysis, output_path, interview_questions=interview_questions)
             progress.update(task, description=f"[green]✓ Report: {output_path}[/green]")
             progress.stop_task(task)
 
+    print_interview_questions(interview_questions)
     print_terminal_report(company, analysis)
 
     if not no_html:
@@ -180,7 +195,7 @@ def compare(companies, no_reddit, output):
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).parent / ".env", override=True)
     from scrapers.reddit import scrape_reddit, scrape_reddit_company_sub
-    from scrapers.glassdoor import scrape_glassdoor_snippets, scrape_indeed_reviews
+    from scrapers.glassdoor import scrape_glassdoor_snippets, scrape_indeed_reviews, scrape_glassdoor_full_reviews
     from scrapers.yimusan import scrape_yimusan, scrape_yimusan_interview
     from scrapers.interview_sources import scrape_interview_data, scrape_full_interview_posts
     from analyzer.sentiment import analyze_company
@@ -212,6 +227,8 @@ def compare(companies, no_reddit, output):
 
             task = progress.add_task("Glassdoor + Indeed...", total=None)
             try:
+                gd_full = scrape_glassdoor_full_reviews(company)
+                all_posts.extend(gd_full)
                 all_posts.extend(scrape_glassdoor_snippets(company))
                 all_posts.extend(scrape_indeed_reviews(company))
                 progress.update(task, description=f"[green]✓ {len(all_posts)} total sources[/green]")
@@ -315,15 +332,16 @@ def test_analyze(company, text, output):
 
     Example: python main.py test-analyze Shopify "great wlb, slow promotions"
     """
-    from analyzer.sentiment import analyze_company
-    from report import print_terminal_report, generate_html_report
+    from analyzer.sentiment import analyze_company, extract_interview_questions
+    from report import print_terminal_report, print_interview_questions, generate_html_report
 
     fake_posts = [{"source": "manual", "text": text, "comments": []}]
     analysis = analyze_company(company, fake_posts)
+    interview_questions = []
     print_terminal_report(company, analysis)
 
     output_path = output or f"{company.lower()}_culture.html"
-    generate_html_report(company, analysis, output_path)
+    generate_html_report(company, analysis, output_path, interview_questions=interview_questions)
     console.print(f"[bold]HTML Report:[/bold] {output_path}")
 
 
