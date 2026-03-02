@@ -118,22 +118,22 @@ def analyze(company, output, limit, no_html, no_reddit):
             progress.update(task, description=f"[red]✗ Indeed error: {e}[/red]")
         progress.stop_task(task)
 
-        task = progress.add_task("Fetching 一亩三分地...", total=None)
+        task = progress.add_task("Fetching 1point3acres...", total=None)
         try:
             yms = scrape_yimusan(company)
             all_posts.extend(yms)
-            progress.update(task, description=f"[green]✓ 一亩三分地: {len(yms)} posts[/green]")
+            progress.update(task, description=f"[green]✓ 1point3acres: {len(yms)} posts[/green]")
         except Exception as e:
-            progress.update(task, description=f"[red]✗ 一亩三分地 error: {e}[/red]")
+            progress.update(task, description=f"[red]✗ 1point3acres error: {e}[/red]")
         progress.stop_task(task)
 
-        task = progress.add_task("Fetching 一亩三分地面经...", total=None)
+        task = progress.add_task("Fetching 1point3acres interview posts...", total=None)
         try:
             yms_iv = scrape_yimusan_interview(company)
             all_posts.extend(yms_iv)
-            progress.update(task, description=f"[green]✓ 面经: {len(yms_iv)} posts[/green]")
+            progress.update(task, description=f"[green]✓ Interview posts (1point3acres): {len(yms_iv)} posts[/green]")
         except Exception as e:
-            progress.update(task, description=f"[red]✗ 面经 error: {e}[/red]")
+            progress.update(task, description=f"[red]✗ 1point3acres interview error: {e}[/red]")
         progress.stop_task(task)
 
         task = progress.add_task("Fetching Glassdoor interviews + LeetCode...", total=None)
@@ -236,22 +236,22 @@ def compare(companies, no_reddit, output):
                 progress.update(task, description=f"[red]✗ {e}[/red]")
             progress.stop_task(task)
 
-            task = progress.add_task("Fetching 一亩三分地...", total=None)
+            task = progress.add_task("Fetching 1point3acres...", total=None)
             try:
                 yms = scrape_yimusan(company)
                 all_posts.extend(yms)
-                progress.update(task, description=f"[green]✓ 一亩三分地: {len(yms)} posts[/green]")
+                progress.update(task, description=f"[green]✓ 1point3acres: {len(yms)} posts[/green]")
             except Exception as e:
-                progress.update(task, description=f"[red]✗ 一亩三分地: {e}[/red]")
+                progress.update(task, description=f"[red]✗ 1point3acres: {e}[/red]")
             progress.stop_task(task)
 
-            task = progress.add_task("Fetching 面经...", total=None)
+            task = progress.add_task("Fetching 1point3acres interview posts...", total=None)
             try:
                 yms_iv = scrape_yimusan_interview(company)
                 all_posts.extend(yms_iv)
-                progress.update(task, description=f"[green]✓ 面经: {len(yms_iv)} posts[/green]")
+                progress.update(task, description=f"[green]✓ Interview posts (1point3acres): {len(yms_iv)} posts[/green]")
             except Exception as e:
-                progress.update(task, description=f"[red]✗ 面经: {e}[/red]")
+                progress.update(task, description=f"[red]✗ 1point3acres interviews: {e}[/red]")
             progress.stop_task(task)
 
             task = progress.add_task("Glassdoor interviews + LeetCode...", total=None)

@@ -1,23 +1,36 @@
 # Company Culture Analyzer
 
-A CLI tool that scrapes Reddit discussions and Glassdoor snippets about a company, then uses AI to generate an honest culture report — covering work-life balance, management quality, career growth, compensation, and more.
+An AI-powered CLI tool that automatically scrapes multiple data sources and generates honest, structured culture reports for any company — covering work-life balance, management quality, compensation, interview process, and more.
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
+![AI](https://img.shields.io/badge/AI-Gemini%202.5%20Flash-purple)
 
 ## Why
 
-Job postings tell you what a company wants. Culture reports tell you what it's actually like to work there. This tool aggregates real employee discussions from Reddit and Glassdoor and uses Gemini AI to extract honest, structured insights.
+Job postings tell you what a company wants you to hear. This tool aggregates real employee discussions from 7+ sources and uses Gemini AI to extract honest, structured insights — including actual interview questions people reported.
 
 ## Features
 
-- Searches multiple subreddits (`cscareerquestions`, `ExperiencedDevs`, `jobs`, and more)
-- Checks the company's own subreddit if one exists
-- Fetches Glassdoor and Indeed review snippets via search
-- Uses Gemini AI (free) to score 6 culture dimensions with evidence
-- Falls back to keyword analysis if no API key is set
-- Outputs both a terminal report and a self-contained HTML file
-- Interactive setup wizard for API keys
+- **Multi-source scraping** — Glassdoor, Indeed, Reddit, LeetCode Discuss, and 1point3acres
+- **AI analysis** — Gemini 2.5 Flash (with Groq/Llama fallback) scores 6 culture dimensions with real evidence
+- **Interview question extraction** — Pulls specific questions and round details from LeetCode posts
+- **Multi-company comparison** — Compare culture across multiple companies side by side
+- **HTML report** — Self-contained report file that works offline
+- **Keyword fallback** — Works without an API key using basic keyword analysis
+- **Chinese community data** — Scrapes 1point3acres for Chinese tech worker insights (translated to English)
+
+## Data Sources
+
+| Source | What It Provides | Auth Required |
+|--------|-----------------|---------------|
+| Glassdoor | Employee reviews, ratings, compensation data | None (via search) |
+| Indeed | Employee reviews, work environment feedback | None (via search) |
+| Reddit | Candid discussions across tech subreddits | Free API key |
+| LeetCode Discuss | Full interview experience posts with specific questions | None (GraphQL API) |
+| 1point3acres | Chinese tech worker interview experiences and reviews | None (snippets) |
+
+> **Note on Reddit:** Reddit API approval currently takes 2–7 days. The tool works fully without Reddit — all other sources are available immediately. Reddit data will be added automatically once the API key is approved.
 
 ## Installation
 
@@ -33,9 +46,11 @@ pip install -r requirements.txt
 python main.py setup
 ```
 
-This will prompt you for:
-- **Reddit API key** (free) — [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps) → Create app → script
+This prompts you for:
+- **SerpAPI key** (free tier: 100 searches/month) — [serpapi.com](https://serpapi.com)
 - **Gemini API key** (free) — [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+- **Groq API key** (free, Gemini fallback) — [console.groq.com](https://console.groq.com)
+- **Reddit API key** (free, optional) — [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps)
 
 Or manually copy `.env.example` to `.env` and fill in your keys.
 
@@ -45,68 +60,69 @@ Or manually copy `.env.example` to `.env` and fill in your keys.
 # Analyze a company
 python main.py analyze Shopify
 
-# Analyze with custom output file
-python main.py analyze "Google" --output google_report.html
+# Skip Reddit (faster, no Reddit key needed)
+python main.py analyze Shopify --no-reddit
+
+# Compare multiple companies
+python main.py compare Shopify Stripe Airbnb
 
 # Terminal output only (no HTML)
 python main.py analyze Microsoft --no-html
-
-# Fetch more posts for a deeper analysis
-python main.py analyze Amazon --limit 80
 ```
 
-## Output
+## Sample Output
 
-**Terminal:**
 ```
-┌─────────────────────────────────────────────┐
-│ Shopify Culture Report                       │
-│ 47 posts · 112 samples · reddit, glassdoor  │
-└─────────────────────────────────────────────┘
+Shopify Culture Report
+Based on 101 posts · Sources: glassdoor, indeed, 1point3acres, leetcode
 
-Dimension          Score   Rating
-Work-Life Balance  8/10    ████████████░░░
-Management         7/10    ███████████░░░░
-Career Growth      7/10    ███████████░░░░
-Compensation       8/10    ████████████░░░
-Culture            8/10    ████████████░░░
-Interview          5/10    ████████░░░░░░░
+Dimension            Score   Summary
+Work-Life Balance    6/10    High stress reported in fast-paced teams
+Management Quality   4/10    Frequent reorgs, inconsistent leadership
+Career Growth        4/10    Limited promotion paths, many leaving
+Compensation         3/10    20-30% below market, known to underpay
+Culture & Inclusion  4/10    Culture has deteriorated, per reviews
+Interview Process    8/10    OA → Phone Screen → Pair Programming → Onsite
 
-Overall Verdict: Shopify is generally well-regarded...
-
-Green Flags
-  ✓ Strong remote-first culture
-  ✓ Competitive compensation with equity
+Overall Verdict: Shopify has smart colleagues and interesting work, but
+compensation and career growth are significant concerns.
 
 Red Flags
-  ✗ Interview process is lengthy (4-6 rounds)
-  ✗ Fast pace may not suit everyone
+  ✗ Compensation 20-30% below market
+  ✗ Frequent reorgs and culture deterioration
+  ✗ Low career opportunities rating (3.0/5)
+
+Green Flags
+  ✓ Smart and kind colleagues
+  ✓ Supportive interviewers during pair programming
+  ✓ Challenging, meaningful work
+
+Interview Questions & Rounds
+  Phone Screen    | Implement shopping cart with discount strategies (strategy pattern) | coding · easy
+  Pair Programming| TDD implementation of a feature with SQL                           | coding · medium
+  Onsite          | ML system design: design a recommendation engine                   | system_design · hard
+  Behavioral      | Tell me about a time you disagreed with a technical decision        | behavioral
 ```
-
-**HTML:** A self-contained report file that works offline.
-
-## Data Sources
-
-| Source | Method | Auth |
-|--------|--------|------|
-| Reddit | Official PRAW API | Free API key |
-| Glassdoor | Search engine snippets | None |
-| Indeed | Search engine snippets | None |
 
 ## How It Works
 
-1. Searches Reddit across 6+ subreddits for discussions mentioning the company
-2. Checks for a company-specific subreddit
-3. Fetches Glassdoor and Indeed snippets via DuckDuckGo search
-4. Sends all collected text to Gemini AI for structured analysis
-5. Generates a scored report across 6 dimensions with supporting evidence
+1. Scrapes 7 sources in parallel for employee reviews and interview posts
+2. Fetches full LeetCode interview posts via GraphQL API (no auth required)
+3. Translates Chinese content from 1point3acres to English via AI
+4. Sends all data to Gemini AI for structured analysis across 6 dimensions
+5. Extracts specific interview questions and round details from interview posts
+6. Generates terminal report + self-contained HTML file
 
-## Notes
+## Tech Stack
 
-- Results reflect public online discussions and may not represent all employees
-- Data quality varies by company size and online presence
-- Gemini API key is optional but strongly recommended for meaningful analysis
-- Reddit API key is required for Reddit data
+- **Python 3.8+** — CLI with Click
+- **SerpAPI** — Reliable Glassdoor/Indeed search results
+- **PRAW** — Reddit API (optional)
+- **LeetCode GraphQL API** — Full interview post content
+- **BeautifulSoup** — HTML parsing
+- **Gemini 2.5 Flash** — AI analysis and translation
+- **Groq (Llama 3.3 70B)** — Fallback when Gemini quota is exceeded
+- **Rich** — Terminal formatting
 
 ## License
 
